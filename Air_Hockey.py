@@ -9,8 +9,11 @@ COLOR_PALETTE = {
     "SMILY GREEN" : (71, 160, 37)
 }
 
+WIDTH = 1280
+HEIGHT = 720
+
 class Player:
-    def __init__(self, pos, vel, acc, r, col, m):
+    def __init__(self, pos, vel, acc, r, col, m, pn):
         # [x, y]
         self.pos = pos
         self.vel = vel
@@ -18,13 +21,40 @@ class Player:
         self.r = r
         self.col = col
         self.m = m
+        self.pn = pn
+        if pn == 1:
+            self.up = pg.K_w
+            self.down = pg.K_s
+            self.right = pg.K_d
+            self.left = pg.K_a
+            self.bounds = [0, WIDTH/2-r]
+        elif pn == 2:
+            self.up = pg.K_i
+            self.down = pg.K_k
+            self.right = pg.K_l
+            self.left = pg.K_j
+            self.bounds = [WIDTH/2+r, WIDTH]
 
     def update(self, keystate):
-        SCALE_FACTOR = 1
-        MAX_VEL = 10
+        if self.pn == 1:
+            self.up = pg.K_w
+            self.down = pg.K_s
+            self.right = pg.K_d
+            self.left = pg.K_a
+            self.bounds = [0, WIDTH/2-self.r]
+        elif self.pn == 2:
+            self.up = pg.K_i
+            self.down = pg.K_k
+            self.right = pg.K_l
+            self.left = pg.K_j
+            self.bounds = [WIDTH/2+self.r, WIDTH]
 
-        self.acc[0] = SCALE_FACTOR * (int(keystate[pg.K_d]) - int(keystate[pg.K_a]))
-        self.acc[1] = SCALE_FACTOR * (int(keystate[pg.K_s]) - int(keystate[pg.K_w]))
+
+        SCALE_FACTOR = 1
+        MAX_VEL = 15 if keystate[pg.K_LSHIFT] else 10
+
+        self.acc[0] = SCALE_FACTOR * (int(keystate[self.right]) - int(keystate[self.left])) 
+        self.acc[1] = SCALE_FACTOR * (int(keystate[self.down]) - int(keystate[self.up])) 
 
         self.vel[0] = copysign(min(abs(self.vel[0] + SCALE_FACTOR * self.acc[0]), MAX_VEL), self.vel[0] + SCALE_FACTOR * self.acc[0])
         self.vel[1] = copysign(min(abs(self.vel[1] + SCALE_FACTOR * self.acc[1]), MAX_VEL), self.vel[1] + SCALE_FACTOR * self.acc[1])
@@ -32,10 +62,18 @@ class Player:
         self.pos[0] = self.pos[0] + SCALE_FACTOR * self.vel[0]
         self.pos[1] = self.pos[1] + SCALE_FACTOR * self.vel[1]
 
-        if self.pos[0] < self.r or self.pos[0] > 1280-self.r:
+        if self.pos[0] < self.r + self.bounds[0]:
             self.vel[0] *= -1
-        if self.pos[1] < self.r or self.pos[1] > 720-self.r:
+            self.pos[0] = self.r + self.bounds[0]
+        elif self.pos[0] > self.bounds[1]:
+            self.vel[0] *= -1
+            self.pos[0] = self.bounds[1]
+        if self.pos[1] < self.r:
             self.vel[1] *= -1
+            self.pos[1] = self.r
+        elif self.pos[1] > HEIGHT-self.r:
+            self.vel[1] *= -1
+            self.pos[1] = HEIGHT-self.r
 
         self.vel[0] *= 0.95
         self.vel[1] *= 0.95
@@ -63,9 +101,9 @@ class Ball:
         self.pos[0] = self.pos[0] + SCALE_FACTOR * self.vel[0]
         self.pos[1] = self.pos[1] + SCALE_FACTOR * self.vel[1]
 
-        if self.pos[0] < self.r or self.pos[0] > 1280-self.r:
+        if self.pos[0] < self.r or self.pos[0] > WIDTH-self.r:
             self.vel[0] *= -1
-        if self.pos[1] < self.r or self.pos[1] > 720-self.r:
+        if self.pos[1] < self.r or self.pos[1] > HEIGHT-self.r:
             self.vel[1] *= -1
 
     def draw(self, surface):
@@ -96,12 +134,13 @@ def update_collision(a, b):
 
 # Initialize PyGame PreReqs
 pg.init()
-screen = pg.display.set_mode((1280, 720), pg.HWSURFACE | pg.DOUBLEBUF)
-surface = pg.Surface((1280, 720))
-FPS = 60
+screen = pg.display.set_mode((WIDTH, HEIGHT), pg.HWSURFACE | pg.DOUBLEBUF)
+surface = pg.Surface((WIDTH, HEIGHT))
+FPS = 61
 clock = pg.time.Clock()
-player = Player([1280/2, 720/2], [0, 0], [0, 0], 25, COLOR_PALETTE["BLOOD RED"], 1)
-ball = Ball([1280/4*3, 720/4], [0, 0], [0, 0], 25, COLOR_PALETTE["SMILY GREEN"], 1)
+player = Player([WIDTH/4, HEIGHT/2], [0, 0], [0, 0], 25, COLOR_PALETTE["BLOOD RED"], 1, 1)
+player2 = Player([WIDTH/4*3, HEIGHT/2], [0, 0], [0, 0], 25, COLOR_PALETTE["BLOOD RED"], 1, 2)
+ball = Ball([WIDTH/2, HEIGHT/4], [0, 0], [0, 0], 25, COLOR_PALETTE["SMILY GREEN"], 1)
 
 # Game Loop
 while True:
@@ -123,13 +162,20 @@ while True:
         temp = copy.copy(player)
         player.vel = update_collision(player, ball)
         ball.vel = update_collision(ball, temp)
+    if check_collision(player2, ball):
+        temp = copy.copy(player2)
+        player2.vel = update_collision(player2, ball)
+        ball.vel = update_collision(ball, temp)
     player.update(keystate)
+    player2.update(keystate)
     ball.update()
 
     # Draw
     surface.fill(COLOR_PALETTE["DARK PURPLE"])
+    pg.draw.line(surface, COLOR_PALETTE["CHINESE RED"], (WIDTH/2+25/2, 0), (WIDTH/2+25/2, HEIGHT), 25)
     ball.draw(surface)
     player.draw(surface)
+    player2.draw(surface)
 
     # Push to switch buffer
     screen.blit(surface, (0, 0))
