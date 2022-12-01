@@ -1,2 +1,3 @@
 pyrightconfig.json
 .win_venv/*
+.linux_venv/*
